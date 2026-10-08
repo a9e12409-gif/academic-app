@@ -1,0 +1,127 @@
+import React,{useEffect,useMemo,useState} from "react";
+import{createRoot}from"react-dom/client";
+import{ArrowDownToLine,ArrowUpFromLine,Bell,BookOpen,CalendarDays,Check,ChevronDown,ChevronLeft,Clock3,Ellipsis,FilePlus2,FlaskConical,FolderOpen,GraduationCap,Link2,MapPin,MessageCircle,NotebookPen,Plus,Trash2,Video,X}from"lucide-react";
+import"./styles.css";
+const KEY="academic-metro-hub:v1", EMPTY={courses:[],sessions:[],exams:[],attendance:{},tasks:{},notes:{},resources:{},notifyEnabled:false};
+const DAYS=["السبت","الأحد","الإثنين","الثلاثاء","الأربعاء","الخميس","الجمعة"], TYPES={lecture:"محاضرة",lab:"سكشن / معمل"}, EXAMS={written:"تحريري",practical:"عملي",oral:"شفوي",project:"تسليم مشروع"};
+const uid=()=>crypto.randomUUID?.()||"id-"+Date.now()+Math.random(), norm=s=>(s||"").trim().toLocaleLowerCase("ar"), today=()=>(new Date().getDay()+1)%7;
+const keyDate=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const dateFor=i=>{let d=new Date(),delta=(((i+6)%7)-d.getDay()+7)%7;d.setDate(d.getDate()+delta);return d};
+const mins=t=>{let p=(t||"00:00").split(":").map(Number);return(p[0]||0)*60+(p[1]||0)};
+const end=t=>{let n=(mins(t)+90)%1440;return String(Math.floor(n/60)).padStart(2,"0")+":"+String(n%60).padStart(2,"0")};
+const fmt=(d,o={day:"numeric",month:"short"})=>new Intl.DateTimeFormat("ar-EG",o).format(d);
+function load(){try{let d=JSON.parse(localStorage.getItem(KEY)||"null");if(d&&Array.isArray(d.courses)&&Array.isArray(d.sessions))return{...EMPTY,...d}}catch{}return EMPTY}
+function useStore(){let[d,set]=useState(load);useEffect(()=>{try{localStorage.setItem(KEY,JSON.stringify(d))}catch{}},[d]);return[d,set]}
+const db=typeof indexedDB==="undefined"?Promise.resolve(null):new Promise((resolve,reject)=>{let r=indexedDB.open("academic-metro-hub-files",1);r.onupgradeneeded=()=>r.result.createObjectStore("files",{keyPath:"id"});r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
+async function putFile(id,blob){let d=await db;if(!d)throw Error();return new Promise((res,rej)=>{let t=d.transaction("files","readwrite");t.objectStore("files").put({id,blob});t.oncomplete=res;t.onerror=()=>rej(t.error)})}
+async function getFile(id){let d=await db;if(!d)return null;return new Promise((res,rej)=>{let r=d.transaction("files").objectStore("files").get(id);r.onsuccess=()=>res(r.result?.blob||null);r.onerror=()=>rej(r.error)})}
+function Modal({title,close,children}){useEffect(()=>{let f=e=>e.key==="Escape"&&close();window.addEventListener("keydown",f);return()=>window.removeEventListener("keydown",f)},[close]);return <div className="scrim" onMouseDown={e=>e.target===e.currentTarget&&close()}><section className="modal" role="dialog" aria-modal="true"><div className="modal-head"><div><h2>{title}</h2></div><button className="icon-btn" onClick={close} aria-label="إغلاق"><X size={18}/></button></div>{children}</section></div>}
+function TaskList({items,add,toggle,remove}){let[v,set]=useState("");return <div className="tasks"><form onSubmit={e=>{e.preventDefault();add(v);set("")}}><input value={v} onChange={e=>set(e.target.value)} placeholder="أضف واجبًا أو موعد تسليم"/><button disabled={!v.trim()} aria-label="إضافة"><Plus size={15}/></button></form>{items.length?items.map(t=><div className={"task "+(t.done?"done":"")} key={t.id}><button className="check" onClick={()=>toggle(t.id)}>{t.done&&<Check size={12}/>}</button><span>{t.title}</span><button className="remove" onClick={()=>remove(t.id)} aria-label="حذف"><X size={13}/></button></div>):<p className="hint">أضف المطلوب هنا ليبقى واضحًا.</p>}</div>}
+function App(){
+ const[data,setData]=useStore(),[view,setView]=useState("daily"),[day,setDay]=useState(today),[courseId,setCourseId]=useState(""),[openStation,setOpenStation]=useState(""),[openSession,setOpenSession]=useState(""),[toolTab,setToolTab]=useState("files"),[modal,setModal]=useState(""),[clock,setClock]=useState(new Date()),[toast,setToast]=useState(""),[more,setMore]=useState(false);
+ const courses=data.courses, getCourse=id=>courses.find(c=>c.id===id), chosen=getCourse(courseId)||courses[0], date=dateFor(day), dk=keyDate(date);
+ const sessions=useMemo(()=>data.sessions.filter(s=>+s.day===day).sort((a,b)=>a.start.localeCompare(b.start)),[data.sessions,day]);
+ const exams=useMemo(()=>[...data.exams].sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)),[data.exams]), upcoming=exams.filter(e=>e.date>=keyDate(new Date()));
+ const nowM=clock.getHours()*60+clock.getMinutes();
+ const nextUp=day===today()?sessions.find(s=>nowM<mins(s.start)+90):null;
+ const nextLive=!!(nextUp&&nowM>=mins(nextUp.start));
+ const msg=s=>{setToast(s);setTimeout(()=>setToast(""),2600)}, part=(k,v)=>setData(d=>({...d,[k]:v}));
+ useEffect(()=>{let t=setInterval(()=>setClock(new Date()),30000);return()=>clearInterval(t)},[]);
+ useEffect(()=>{if(nextUp)setOpenStation(nextUp.id)},[day,nextUp?.id]);
+ useEffect(()=>{if(!data.notifyEnabled||!("Notification"in window)||Notification.permission!=="granted")return;let check=()=>{let ix=today(),date=keyDate(new Date());data.sessions.filter(s=>+s.day===ix).forEach(s=>{let[h,m]=s.start.split(":").map(Number),start=new Date();start.setHours(h,m,0,0);let id="amh:"+date+":"+s.id,diff=start-Date.now();if(diff>0&&diff<=900000&&!localStorage.getItem(id)){new Notification("موعد محاضرتك يقترب",{body:(getCourse(s.courseId)?.name||s.courseName)+(s.room?" · "+s.room:"")});localStorage.setItem(id,"1")}})};check();let t=setInterval(check,30000);return()=>clearInterval(t)},[data.notifyEnabled,data.sessions,data.courses]);
+ const addSession=f=>{let c=courses.find(c=>norm(c.name)===norm(f.name))||{id:uid(),name:f.name.trim(),maxAbsences:3,whatsapp:""};let s={id:uid(),courseId:c.id,courseName:c.name,day:+f.day,type:f.type,start:f.start,duration:90,room:f.room.trim()};setData(d=>({...d,courses:d.courses.some(x=>x.id===c.id)?d.courses:[...d.courses,c],sessions:[...d.sessions,s]}));setCourseId(c.id);setOpenStation(s.id);setModal("");msg("أُضيف الموعد وسُجّل المقرر")};
+ const addCourse=name=>{if(!name.trim())return;if(courses.some(c=>norm(c.name)===norm(name))){msg("هذا المقرر موجود بالفعل");return}let c={id:uid(),name:name.trim(),maxAbsences:3,whatsapp:""};part("courses",[...courses,c]);setCourseId(c.id);setModal("");msg("أُضيف المقرر")};
+ const mark=(s,status)=>part("attendance",{...data.attendance,[s.id+":"+dk]:{courseId:s.courseId,status,date:dk}});
+ const absences=id=>Object.values(data.attendance).filter(a=>a.courseId===id&&a.status==="absent").length;
+ const addTask=(id,title)=>{if(title.trim())part("tasks",{...data.tasks,[id]:[...(data.tasks[id]||[]),{id:uid(),title:title.trim(),done:false}]})};
+ const taskAction=(id,fn)=>taskId=>part("tasks",{...data.tasks,[id]:(data.tasks[id]||[]).map(t=>t.id===taskId?fn(t):t)});
+ const resource=(id,patch)=>part("resources",{...data.resources,[id]:{...(data.resources[id]||{}),...patch}});
+ const attach=async(s,list)=>{try{let files=[...(data.resources[s.id]?.files||[])];for(let f of Array.from(list||[])){let id=uid();await putFile(id,f);files.push({id,name:f.name,size:f.size,type:f.type})}resource(s.id,{files});msg("أُرفق الملف بنجاح")}catch{msg("تعذّر حفظ الملف على هذا الجهاز")}};
+ const openFile=async f=>{let b=await getFile(f.id);if(!b){msg("الملف غير متاح على هذا الجهاز");return}let u=URL.createObjectURL(b);window.open(u,"_blank","noopener,noreferrer");setTimeout(()=>URL.revokeObjectURL(u),60000)};
+ const jump=id=>{setCourseId(id);setView("courses");setOpenSession("");setToolTab("files")};
+ const exportData=()=>{let b=new Blob([JSON.stringify({app:"Academic Metro Hub",version:1,data},null,2)],{type:"application/json"}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download="academic-metro-hub-backup.json";a.click();URL.revokeObjectURL(u);msg("تم تنزيل نسخة JSON")};
+ const importData=async f=>{if(!f)return;try{let d=JSON.parse(await f.text());d=d.data||d;if(!Array.isArray(d.courses)||!Array.isArray(d.sessions))throw Error();setData({...EMPTY,...d});setCourseId(d.courses[0]?.id||"");setModal("");msg("تم استيراد الجدول")}catch{msg("ملف JSON غير صالح")}};
+ const notif=async()=>{if(data.notifyEnabled){part("notifyEnabled",false);return}if(!("Notification"in window)){msg("المتصفح لا يدعم الإشعارات");return}if(await Notification.requestPermission()==="granted"){part("notifyEnabled",true);msg("التنبيهات مفعلة قبل الموعد بـ 15 دقيقة")}else msg("لم يسمح المتصفح بالإشعارات")};
+ const go=v=>{setView(v);setMore(false)};
+ const primaryAction=()=>setModal(view==="courses"?"course":view==="exam"?"exam":"session");
+ const primaryLabel=view==="courses"?"مادة جديدة":view==="exam"?"موعد امتحان":"إضافة موعد";
+ const nav=<div className="nav" role="tablist">
+  <button className={view==="daily"?"selected":""} onClick={()=>go("daily")}><Clock3 size={15}/>اليوم</button>
+  <button className={view==="courses"?"selected":""} onClick={()=>go("courses")}><BookOpen size={15}/>المواد</button>
+  <button className={view==="exam"?"selected":""} onClick={()=>go("exam")}><CalendarDays size={15}/>الامتحانات {upcoming.length>0&&<small>{upcoming.length}</small>}</button>
+ </div>;
+ const station=s=>{let c=getCourse(s.courseId),isOpen=openStation===s.id,start=mins(s.start),cur=clock.getHours()*60+clock.getMinutes(),live=day===today()&&cur>=start&&cur<start+90,progress=live?Math.min(100,Math.max(0,(cur-start)/90*100)):0,att=data.attendance[s.id+":"+dk]?.status;
+ return <article className={"station "+(live?"live":"")} key={s.id}><i className={"node "+(s.type==="lab"?"mint":"")}/>
+ <button className="station-head" onClick={()=>setOpenStation(isOpen?"":s.id)}><span className="time"><b>{s.start}</b>{end(s.start)}</span><span className="station-info"><span className="title"><strong>{c?.name||s.courseName}</strong><small className={s.type==="lab"?"mint-tag":""}>{TYPES[s.type]}</small>{live&&<em>الآن</em>}</span>{s.room&&<span className="room"><MapPin size={13}/>{s.room}</span>}{live&&<><span className="progress"><i style={{width:progress+"%"}}/></span><small className="remaining">متبقي {Math.max(0,start+90-cur)} دقيقة</small></>}</span><ChevronDown size={16} className={isOpen?"rot":""}/></button>
+ {isOpen&&<div className="station-drawer"><div className="att-row"><span>الحضور</span><span><button className={att==="present"?"present":""} onClick={()=>mark(s,"present")}>حاضر</button><button className={att==="absent"?"absent":""} onClick={()=>mark(s,"absent")}>غياب</button></span></div><div className="station-actions"><QuickTask onAdd={v=>addTask(s.id,v)}/><button className="plain" onClick={()=>jump(s.courseId)}><BookOpen size={14}/> فتح المادة <ChevronLeft size={13}/></button><button className="remove" onClick={()=>{if(confirm("حذف هذا الموعد من المسار؟")){setData(d=>({...d,sessions:d.sessions.filter(x=>x.id!==s.id)}));setOpenStation("")}}} aria-label="حذف"><Trash2 size={14}/></button></div></div>}</article>};
+ const tools=s=>{let r=data.resources[s.id]||{},files=r.files||[],tasks=data.tasks[s.id]||[];return <div className="session-tools">
+ <div className="tool-tabs">
+  <button className={toolTab==="files"?"on":""} onClick={()=>setToolTab("files")}>ملفات</button>
+  <button className={toolTab==="tasks"?"on":""} onClick={()=>setToolTab("tasks")}>تكليفات</button>
+  <button className={toolTab==="notes"?"on":""} onClick={()=>setToolTab("notes")}>ملاحظات</button>
+ </div>
+ {toolTab==="files"&&<>
+  <div className="tool-row"><b><FolderOpen size={15}/> ملفات المذاكرة</b><label className="outline"><FilePlus2 size={14}/> إرفاق<input type="file" multiple accept=".pdf,.ppt,.pptx,.doc,.docx,.jpg,.png,.xlsx" onChange={e=>{attach(s,e.target.files);e.target.value=""}}/></label></div>
+  {files.length?files.map(f=><div className="file-row" key={f.id}><button onClick={()=>openFile(f)}><FilePlus2 size={14}/>{f.name}</button><button className="remove" onClick={()=>resource(s.id,{files:files.filter(x=>x.id!==f.id)})}><X size={13}/></button></div>):<p className="hint">اربط ملفات المحاضرة لتفتحها من هنا.</p>}
+  <div className="tool-row"><b><Video size={15}/> شرح مرئي</b><div className="video-input"><input dir="ltr" value={r.videoUrl||""} placeholder="ألصق رابط YouTube" onChange={e=>resource(s.id,{videoUrl:e.target.value})}/><button disabled={!r.videoUrl} onClick={()=>window.open(r.videoUrl.startsWith("http")?r.videoUrl:"https://"+r.videoUrl,"_blank","noopener,noreferrer")}><Link2 size={14}/></button></div></div>
+ </>}
+ {toolTab==="tasks"&&<TaskList items={tasks} add={v=>addTask(s.id,v)} toggle={taskAction(s.id,t=>({...t,done:!t.done}))} remove={id=>part("tasks",{...data.tasks,[s.id]:(data.tasks[s.id]||[]).filter(t=>t.id!==id)})}/>}
+ {toolTab==="notes"&&<textarea rows="3" value={data.notes[s.id]||""} placeholder="اكتب ملاحظة عن هذه المحاضرة…" onChange={e=>part("notes",{...data.notes,[s.id]:e.target.value})}/>}
+ </div>};
+ return <div className="app">
+ <header>
+  <a className="brand" href="#" dir="ltr" onClick={e=>{e.preventDefault();go("daily")}}><span className="logo"><i/><i/><i/></span>Academic <b>Metro</b></a>
+  <div className="desktop-nav">{nav}</div>
+  <div className="actions">
+   <button className={"icon-btn "+(data.notifyEnabled?"on":"")} title="تنبيه قبل الموعد بـ 15 دقيقة" onClick={notif} aria-label="التنبيهات"><Bell size={18}/></button>
+   <button className={"icon-btn "+(more?"on":"")} title="المزيد" onClick={()=>setMore(!more)} aria-expanded={more} aria-label="المزيد"><Ellipsis size={18}/></button>
+   {more&&<div className="more-menu">
+    <button onClick={()=>{exportData();setMore(false)}}><ArrowDownToLine size={16}/> تصدير نسخة احتياطية</button>
+    <label className="upload"><ArrowUpFromLine size={16}/> استيراد جدول<input type="file" accept=".json,application/json" onChange={e=>{importData(e.target.files?.[0]);e.target.value="";setMore(false)}}/></label>
+   </div>}
+   <button className="cta" onClick={primaryAction}><Plus size={16}/><span className="cta-label">{primaryLabel}</span></button>
+  </div>
+ </header>
+ <main>
+  <section className="intro">
+   <div>
+    <h1>{view==="daily"?<>جدول <em>{DAYS[day]}</em></>:view==="courses"?<>موادك</>:<>الامتحانات</>}</h1>
+    <p>{view==="daily"?fmt(date,{weekday:"long",day:"numeric",month:"long"}):view==="courses"?"الملفات والواجبات لكل مادة.":"القادمة أولًا، والمنتهية باهتة."}</p>
+   </div>
+  </section>
+  {view==="daily"&&nextUp&&<button className="next-card" onClick={()=>setOpenStation(nextUp.id)}>
+   <div><div className="next-kicker">{nextLive?"جارٍ الآن":"التالي"}</div><strong>{getCourse(nextUp.courseId)?.name||nextUp.courseName}</strong><span>{TYPES[nextUp.type]}{nextUp.room?" · "+nextUp.room:""}</span></div>
+   <span className="next-time">{nextUp.start}</span>
+  </button>}
+  {view==="daily"&&<section>
+   <div className="days">{DAYS.map((d,i)=><button className={day===i?"day-on":""} key={d} onClick={()=>setDay(i)}>{d}{i===today()&&<i/>}</button>)}</div>
+   {!sessions.length?<div className="empty"><span className="empty-icon"><Clock3/></span><h3>لا مواعيد في هذا اليوم</h3><p>أضف محاضرة أو معملًا، وسنسجل المادة تلقائيًا.</p><button className="primary" onClick={()=>setModal("session")}><Plus size={15}/> أضف موعدًا</button></div>:<div className="timeline">{sessions.map((s,i)=>{let p=sessions[i-1],gap=p?mins(s.start)-mins(p.start)-90:0;return <React.Fragment key={s.id}>{gap>=10&&<div className="gap"><i/>استراحة {gap.toLocaleString("ar-EG")} دقيقة<i/></div>}{station(s)}</React.Fragment>})}<button className="more-add" onClick={()=>setModal("session")}><Plus size={14}/> أضف موعدًا آخر</button></div>}
+  </section>}
+  {view==="courses"&&<section>
+   {!courses.length?<div className="empty"><span className="empty-icon"><GraduationCap/></span><h3>ابدأ بمادة واحدة</h3><p>أنشئ مادة أو أضف موعدًا من جدول اليوم لتظهر هنا تلقائيًا.</p><button className="primary" onClick={()=>setModal("course")}><Plus size={15}/> إضافة مادة</button></div>:<>
+   <div className="course-grid">{courses.map((c,i)=><button key={c.id} className={"course-tile "+((chosen?.id===c.id)?"course-selected":"")} onClick={()=>{setCourseId(c.id);setOpenSession("");setToolTab("files")}}><i className={"course-icon c"+(i%3)}>{i%3===1?<FlaskConical size={17}/>:i%3===2?<NotebookPen size={17}/>:<BookOpen size={17}/>}</i>{c.name}</button>)}</div>
+   {chosen&&<div className="course-detail"><div className="course-head"><h2>{chosen.name}</h2><div className="course-actions"><label className={"absence "+(absences(chosen.id)>=chosen.maxAbsences?"warn":"")}><i/>غياب {absences(chosen.id)} / {chosen.maxAbsences}<input aria-label="حد الغياب" type="number" min="1" value={chosen.maxAbsences} onChange={e=>part("courses",courses.map(c=>c.id===chosen.id?{...c,maxAbsences:Math.max(1,+e.target.value||1)}:c))}/></label><button className="whatsapp" onClick={()=>chosen.whatsapp?window.open(chosen.whatsapp.startsWith("http")?chosen.whatsapp:"https://"+chosen.whatsapp,"_blank","noopener,noreferrer"):setModal("whatsapp")}><MessageCircle size={15}/> مجموعة المادة</button>{chosen.whatsapp&&<button className="edit-link" onClick={()=>setModal("whatsapp")}>تعديل الرابط</button>}</div></div>
+   <div className="list-head"><b>مواعيد المادة</b><span>{data.sessions.filter(s=>s.courseId===chosen.id).length} لقاءات أسبوعية</span></div>
+   {!data.sessions.some(s=>s.courseId===chosen.id)?<div className="no-sessions"><span>أضف موعدًا لهذه المادة من جدول اليوم.</span><button className="plain" onClick={()=>{setView("daily");setModal("session")}}><Plus size={14}/> إضافة موعد</button></div>:data.sessions.filter(s=>s.courseId===chosen.id).sort((a,b)=>a.day-b.day||a.start.localeCompare(b.start)).map(s=><div className="course-session" key={s.id}><button className="session-toggle" onClick={()=>{setOpenSession(openSession===s.id?"":s.id);setToolTab("files")}}><i className={s.type==="lab"?"mint":""}/><span>{TYPES[s.type]} <small>{DAYS[s.day]} · {s.start}</small></span><em>{s.room||"بدون قاعة"}</em><ChevronDown size={15} className={openSession===s.id?"rot":""}/></button>{openSession===s.id&&tools(s)}</div>)}
+   </div>}</>}
+  </section>}
+  {view==="exam"&&<section>
+   {!exams.length?<div className="empty"><span className="empty-icon"><CalendarDays/></span><h3>لا توجد مواعيد امتحان بعد</h3><p>أضف امتحانًا تحريريًا أو عمليًا.</p><button className="primary" onClick={()=>setModal("exam")}><Plus size={15}/> أضف امتحانًا</button></div>:<div className="exam-line">{exams.map(e=>{let c=getCourse(e.courseId),left=Math.ceil((new Date(e.date+"T"+e.time)-Date.now())/86400000),past=left<0;return <article className={"exam-row"+(past?" past":"")} key={e.id}><div className="exam-info"><span><b>{c?.name||e.courseName}</b><small>{EXAMS[e.type]}</small></span><p><span className="exam-date"><b>{fmt(new Date(e.date+"T12:00:00"))}</b> {e.time}</span>{e.room&&<span><MapPin size={12}/>{e.room}</span>}{e.seating&&<span><GraduationCap size={12}/>رقم الجلوس {e.seating}</span>}</p></div><small className="countdown">{past?"انتهى":left===0?"اليوم":"باقي "+left.toLocaleString("ar-EG")+" يوم"}</small><button className="remove" aria-label="حذف" onClick={()=>part("exams",data.exams.filter(x=>x.id!==e.id))}><X size={14}/></button></article>})}</div>}
+  </section>}
+ </main>
+ <nav className="tabbar" aria-label="التنقل">{nav}</nav>
+ <footer><span>Academic Metro Hub · تنظيم أوضح ليوم أخف</span><span>بياناتك محفوظة على هذا الجهاز فقط</span></footer>
+ {toast&&<div className="toast"><Check size={15}/>{toast}</div>}
+ {more&&<div className="scrim" style={{background:"transparent",backdropFilter:"none",zIndex:11}} onMouseDown={()=>setMore(false)}/>}
+ {modal==="session"&&<SessionModal day={day} close={()=>setModal("")} submit={addSession}/>}
+ {modal==="course"&&<NameModal close={()=>setModal("")} submit={addCourse}/>}
+ {modal==="exam"&&<ExamModal courses={courses} close={()=>setModal("")} submit={e=>{let c=getCourse(e.courseId);if(!c)return;part("exams",[...data.exams,{...e,id:uid(),courseName:c.name}]);setModal("");setView("exam");msg("أُضيف موعد الامتحان")}}/>}
+ {modal==="whatsapp"&&chosen&&<WhatsModal course={chosen} close={()=>setModal("")} save={url=>{part("courses",courses.map(c=>c.id===chosen.id?{...c,whatsapp:url}:c));setModal("")}}/>}
+ </div>
+}
+function QuickTask({onAdd}){let[v,set]=useState("");return <form className="quick-task" onSubmit={e=>{e.preventDefault();onAdd(v);set("")}}><Plus size={14}/><input value={v} onChange={e=>set(e.target.value)} placeholder="تكليف سريع"/><button disabled={!v.trim()}>إضافة</button></form>}
+function SessionModal({day,close,submit}){let[f,set]=useState({name:"",day:String(Math.min(day,5)),type:"lecture",start:"09:00",room:""});return <Modal title="إضافة موعد" close={close}><form className="form" onSubmit={e=>{e.preventDefault();submit(f)}}><label>اسم المادة<input autoFocus required value={f.name} onChange={e=>set({...f,name:e.target.value})} placeholder="مثال: ميكانيكا الموائع"/></label><div className="form-pair"><label>نوع اللقاء<select value={f.type} onChange={e=>set({...f,type:e.target.value})}><option value="lecture">محاضرة</option><option value="lab">سكشن / معمل</option></select></label><label>اليوم<select value={f.day} onChange={e=>set({...f,day:e.target.value})}>{DAYS.slice(0,6).map((d,i)=><option value={i} key={d}>{d}</option>)}</select></label></div><div className="form-pair"><label>وقت البداية<input type="time" value={f.start} onChange={e=>set({...f,start:e.target.value})}/></label><label>القاعة <small>اختياري</small><input value={f.room} onChange={e=>set({...f,room:e.target.value})} placeholder="مثال: معمل الهيدروليك"/></label></div><p className="hint"><Clock3 size={14}/> تنتهي المحطة تلقائيًا بعد ٩٠ دقيقة.</p><button className="primary">إضافة إلى الجدول</button></form></Modal>}
+function NameModal({close,submit}){let[n,set]=useState("");return <Modal title="إضافة مادة" close={close}><form className="form" onSubmit={e=>{e.preventDefault();submit(n)}}><label>اسم المادة<input autoFocus required value={n} onChange={e=>set(e.target.value)} placeholder="مثال: رياضيات هندسية"/></label><p className="hint">يمكنك إضافة مواعيدها وملفاتها لاحقًا.</p><button className="primary">إنشاء المادة</button></form></Modal>}
+function ExamModal({courses,close,submit}){let[f,set]=useState({courseId:courses[0]?.id||"",type:"written",date:keyDate(new Date()),time:"09:00",room:"",seating:""});return <Modal title="إضافة موعد امتحان" close={close}><form className="form" onSubmit={e=>{e.preventDefault();submit(f)}}>{!courses.length?<><p className="hint">أضف مادة أولًا لربط الامتحان بها.</p><button type="button" className="primary" onClick={close}>حسنًا</button></>:<><label>المادة<select value={f.courseId} onChange={e=>set({...f,courseId:e.target.value})}>{courses.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label><div className="form-pair"><label>النوع<select value={f.type} onChange={e=>set({...f,type:e.target.value})}>{Object.entries(EXAMS).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label><label>التاريخ<input type="date" value={f.date} onChange={e=>set({...f,date:e.target.value})}/></label></div><div className="form-pair"><label>الوقت<input type="time" value={f.time} onChange={e=>set({...f,time:e.target.value})}/></label><label>القاعة <small>اختياري</small><input value={f.room} onChange={e=>set({...f,room:e.target.value})}/></label></div><label>رقم الجلوس <small>اختياري</small><input value={f.seating} onChange={e=>set({...f,seating:e.target.value})}/></label><button className="primary">حفظ الموعد</button></>}</form></Modal>}
+function WhatsModal({course,close,save}){let[url,set]=useState(course.whatsapp||"");return <Modal title="مجموعة المادة" close={close}><form className="form" onSubmit={e=>{e.preventDefault();save(url.trim())}}><p className="hint">أضف رابط مجموعة {course.name} على WhatsApp.</p><label>رابط المجموعة<input dir="ltr" value={url} onChange={e=>set(e.target.value)} placeholder="https://chat.whatsapp.com/…"/></label><button className="primary">حفظ الرابط</button></form></Modal>}
+createRoot(document.getElementById("root")).render(<React.StrictMode><App/></React.StrictMode>);

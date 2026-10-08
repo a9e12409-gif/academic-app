@@ -1,0 +1,9 @@
+export const KEY = "academic-metro-hub:v1";
+export const PROFILE_KEY = "academic-metro-hub:profile";
+export const THEME_KEY = "academic-metro-hub:theme";
+export const EMPTY = { courses: [], sessions: [], exams: [], attendance: {}, tasks: {}, notes: {}, resources: {}, notifyEnabled: false };
+export const DAYS = ["السبت", "الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
+export const TYPES = { lecture: "محاضرة", lab: "سكشن / معمل" };
+export const EXAMS = { written: "تحريري", practical: "عملي", oral: "شفوي", project: "تسليم مشروع" };
+export const DURATIONS = [30, 60, 90, 120, 180, 300];
+export const APP_TITLE = "جدولي الجامعي";
