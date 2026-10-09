@@ -1,20 +1,24 @@
-# Academic Metro Hub
+# Campus Line — جدولي الجامعي
 
-A mobile-first Arabic RTL study planner built with React, Tailwind CSS, Vite, and Lucide icons.
+تطبيق تخطيط دراسي ثنائي اللغة (عربي/إنجليزي مع دعم RTL/LTR كامل)، مبني بـ React + Vite، مصمم حول فكرة واحدة: **يومك خط مترو — محطات واضحة ووجهة واحدة**.
 
-## Run locally
+أعيد بناؤه بالكامل في أكتوبر 2026 — راجع [PRODUCT-VISION.md](./PRODUCT-VISION.md) للرؤية التصميمية الكاملة و[UX-AUDIT-REPORT.md](./UX-AUDIT-REPORT.md) لتدقيق ما قبل إعادة البناء.
 
-1. Install Node.js 18 or newer.
-2. Run npm install in this folder.
-3. Run npm run dev and open the local URL printed by Vite.
+## التشغيل محليًا
 
-## Included
+1. ثبّت Node.js 18 أو أحدث.
+2. `npm install` في هذا المجلد.
+3. `npm run dev` وافتح الرابط المطبوع.
 
-- Weekly metro timetable with computed 90-minute sessions and automatic break lengths.
-- Course registration from timetable entries, per-course absence counts, and WhatsApp links.
-- Study files stored in IndexedDB; notes, video URLs, tasks, schedules, and exams stored in localStorage.
-- Exam timeline, countdowns, and review shortcut into each course.
-- JSON export/import for timetable data.
-- Optional notifications 15 minutes before a class. They require browser permission and the app to remain open.
+## الميزات
 
-Study files are not embedded in JSON backups. Their references remain in exported data, but the file blobs stay in the browser profile where they were attached.
+- **٤ تبويبات:** اليوم (خط مترو زمني حي)، المواد، الملفات، الامتحانات — مع FAB سياقي للإضافة.
+- **ثنائي اللغة:** تبديل فوري عربي/إنجليزي من الإعدادات أو الـ Onboarding، مع انقلاب اتجاه الصفحة تلقائيًا (خصائص CSS منطقية 100%).
+- **زمن حقيقي:** بطاقة «الجاية» بعدّاد دائري، شريط تقدم للحصة المباشرة، وإبراز الفجوات كاستراحات.
+- **ملفات دراسية** محفوظة في IndexedDB، ملاحظات وتكليفات لكل حصة، وروابط فيديو شرح.
+- **عد تنازلي للامتحانات** مع تمييز ما اقترب (≤ ٣ أيام) وفصل المنتهية.
+- **أمان البيانات:** تأكيد قبل كل حذف + تراجع ٦ ثوانٍ، تأكيد قبل الاستيراد، تصدير/استيراد JSON.
+- **إشعارات اختيارية** قبل المحاضرة بـ ١٥ دقيقة (تتطلب إذن المتصفح وبقاء التطبيق مفتوحًا).
+- **الوصول:** تباين ≥ 4.5:1، أهداف لمس ≥ 44، أوراق بحبس تركيز وEscape، دعم `prefers-reduced-motion`.
+
+البيانات كلها على الجهاز فقط (ملفات الدراسة لا تُضمّن في نسخ الـ JSON الاحتياطية — تبقى مراجعها).
