@@ -17,7 +17,7 @@ export function saveProfile(p) { try { localStorage.setItem(PROFILE_KEY, JSON.st
 
 export function loadTheme() {
   try { let t = localStorage.getItem(THEME_KEY); if (t === "dark" || t === "light") return t; } catch {}
-  return typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return "dark"; // الهوية داكنة أولًا — قرار تصميمي متعمد
 }
 export function saveTheme(t) { try { localStorage.setItem(THEME_KEY, t); } catch {} }
 

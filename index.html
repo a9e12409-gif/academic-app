@@ -3,23 +3,29 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#F5F6FA" />
-    <meta name="description" content="مساحة دراسية خفيفة لتنظيم يومك الجامعي — مواعيدك وملفاتك وامتحاناتك على جهازك." />
+    <meta name="theme-color" content="#0A0C11" />
+    <meta name="description" content="Campus Line — جدولي الجامعي: أسبوعك كله على خط زمني واحد. ثنائي اللغة (عربي/إنجليزي)." />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <title>جدولي الجامعي</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900;1000&display=swap" rel="stylesheet" />
+    <title>جدولي الجامعي · Campus Line</title>
     <script>
-      // Pre-paint theme bootstrap — يمنع وميض الوضع الخطأ قبل تحميل React
+      // قبل الرسم: اللغة والاتجاه + الثيم الداكن الافتراضي — بلا أي وميض
       (function () {
         try {
+          var p = {};
+          try { p = JSON.parse(localStorage.getItem("academic-metro-hub:profile") || "{}"); } catch (e) {}
+          var lang = p.lang || ((navigator.language || "en").slice(0, 2).toLowerCase() === "ar" ? "ar" : "en");
+          document.documentElement.lang = lang;
+          document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+
           var t = localStorage.getItem("academic-metro-hub:theme");
-          if (t === "dark") {
-            document.documentElement.setAttribute("data-theme", "dark");
+          if (t === "light") {
+            document.documentElement.setAttribute("data-theme", "light");
             var m = document.querySelector('meta[name="theme-color"]');
-            if (m) m.setAttribute("content", "#0E1117");
+            if (m) m.setAttribute("content", "#F2F3F7");
           }
         } catch (e) {}
       })();

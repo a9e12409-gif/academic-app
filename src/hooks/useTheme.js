@@ -9,7 +9,7 @@ export function useTheme() {
     root.dataset.theme = theme;
     root.classList.add("theme-anim");
     let meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.content = theme === "dark" ? "#0E1117" : "#F5F6FA";
+    if (meta) meta.content = theme === "dark" ? "#0A0C11" : "#F2F3F7";
     saveTheme(theme);
     const t = setTimeout(() => root.classList.remove("theme-anim"), 320);
     return () => clearTimeout(t);
